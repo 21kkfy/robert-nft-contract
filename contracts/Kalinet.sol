@@ -119,12 +119,6 @@ contract Kalinet is ERC721A, OwnableNR, ReentrancyGuard, ERC2981 {
             msg.value >= (PUBLIC_SALE_PRICE * _quantity),
             "Kalinet :: Not enough AVAX. "
         );
-        /// Reveal Kalinet on sold-out.
-        /// Reduce royalty fee to 5%
-        if (totalSupply() == MAX_SUPPLY) {
-            isRevealed = true;
-            _setDefaultRoyalty(marketDAOWallet, uint96(royaltyDividend / 2));
-        }
         totalPublicMint[msg.sender] += _quantity;
 
         _safeMint(msg.sender, _quantity);
@@ -143,7 +137,6 @@ contract Kalinet is ERC721A, OwnableNR, ReentrancyGuard, ERC2981 {
         nonReentrant
         callerIsUser
         notPaused
-        isWhitelisted(msg.sender)
     {
         require(whiteListSale, "Kalinet :: White-list minting is on pause");
         require(
