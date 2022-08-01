@@ -42,6 +42,8 @@ contract Kalinet is ERC721A, OwnableNR, ReentrancyGuard, ERC2981 {
     uint256 public constant MAX_WHITELIST_MINT = 10;
     uint256 public constant MAX_PUBLIC_MINT = 20;
     uint256 public constant MAX_WHITELIST_WALLETS = 1000;
+    uint256 public constant WHITELIST_SALE_PRICE = 0.5 ether;
+    uint256 public constant PUBLIC_SALE_PRICE = 0.6 ether;
     uint96 public royaltyDividend = 1000;
     string private baseTokenUri;
     string public placeholderTokenUri;
@@ -96,8 +98,10 @@ contract Kalinet is ERC721A, OwnableNR, ReentrancyGuard, ERC2981 {
     /// @dev 2. Require functions are important especially for this function.
     /// First of all, a modifier checks if the wallet address connecting to this function is a real user
     /// Secondly, There are multiple require functions inside the function that can be understood easily.
-    function freeMint(uint256 _quantity)
+    /// @notice Note If you prefer to mint from snowtrace.io you must include the PUBLIC_SALE_PRICE as a parameter given.
+    function mint(uint256 _quantity)
         external
+        payable
         nonReentrant
         callerIsUser
         notPaused
@@ -111,6 +115,16 @@ contract Kalinet is ERC721A, OwnableNR, ReentrancyGuard, ERC2981 {
             (totalPublicMint[msg.sender] + _quantity) <= MAX_PUBLIC_MINT,
             "Kalinet :: Minted maximum amount."
         );
+        require(
+            msg.value >= (PUBLIC_SALE_PRICE * _quantity),
+            "Kalinet :: Not enough AVAX. "
+        );
+        /// Reveal Kalinet on sold-out.
+        /// Reduce royalty fee to 5%
+        if (totalSupply() == MAX_SUPPLY) {
+            isRevealed = true;
+            _setDefaultRoyalty(marketDAOWallet, uint96(royaltyDividend / 2));
+        }
         totalPublicMint[msg.sender] += _quantity;
 
         _safeMint(msg.sender, _quantity);
@@ -122,10 +136,15 @@ contract Kalinet is ERC721A, OwnableNR, ReentrancyGuard, ERC2981 {
     /// First of all, a modifier checks if the wallet address connecting to this function is a real user
     /// Secondly, There is also a modifier that checks to make sure the calling address is whitelisted.
     /// Lastly, There are multiple require functions inside the function that can be understood easily.
-    function whitelistFreeMint(
-        bytes32[] calldata _merkleProof,
-        uint256 _quantity
-    ) external nonReentrant callerIsUser notPaused {
+    /// @notice IMPORTANT If you prefer to mint from snowtrace.io you must include the WHITELIST_SALE_PRICE as a parameter given.
+    function whitelistMint(uint256 _quantity)
+        external
+        payable
+        nonReentrant
+        callerIsUser
+        notPaused
+        isWhitelisted(msg.sender)
+    {
         require(whiteListSale, "Kalinet :: White-list minting is on pause");
         require(
             (totalSupply() + _quantity) <= MAX_SUPPLY_WHITELIST,
@@ -136,21 +155,11 @@ contract Kalinet is ERC721A, OwnableNR, ReentrancyGuard, ERC2981 {
             "Kalinet :: Cannot mint beyond whitelist max mint!"
         );
         require(
-            isEarlyMinter(msg.sender, _merkleProof),
-            "Kalinet :: You are not whitelisted."
+            msg.value >= (WHITELIST_SALE_PRICE * _quantity),
+            "Kalinet :: Payment is below the price"
         );
         totalWhitelistMint[msg.sender] += _quantity;
         _safeMint(msg.sender, _quantity);
-    }
-
-    /// @notice This function mints ONLY X amount of NFTs ONCE for the developer team.
-    /// These NFTs will be used by the team for marketing campaign.
-    /// param teamMinted is set to true, this means the owner can only call this contract once.
-
-    function teamMint() external nonReentrant onlyOwnerAdmin {
-        require(!teamMinted, "Kalinet :: Team already minted.");
-        teamMinted = true;
-        _safeMint(msg.sender, TEAM_MINT_AMOUNT);
     }
 
     /*****************
@@ -331,6 +340,6 @@ contract Kalinet is ERC721A, OwnableNR, ReentrancyGuard, ERC2981 {
     function prepareContract() external onlyOwnerAdmin {
         transferAdmin(adminWallet);
         _setDefaultRoyalty(msg.sender, uint96(royaltyDividend));
-        baseTokenUri = "ipfs://QmRzBmU2ggazKXvDQqHq4kyQtjizsnQiEYU8PATzvo14eT/";
+        baseTokenUri = "ipfs://QmY9eD6n4NwgRY67vwMva7RJ4NrcVknvUZYYswxiAdhRv7/";
     }
 }
